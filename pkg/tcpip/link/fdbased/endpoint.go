@@ -43,8 +43,7 @@ package fdbased
 import (
 	"fmt"
 	"runtime"
-	
-	"golang.org/x/sys/unix"
+
 	"github.com/metacubex/gvisor/pkg/atomicbitops"
 	"github.com/metacubex/gvisor/pkg/buffer"
 	"github.com/metacubex/gvisor/pkg/common"
@@ -53,6 +52,7 @@ import (
 	"github.com/metacubex/gvisor/pkg/tcpip"
 	"github.com/metacubex/gvisor/pkg/tcpip/header"
 	"github.com/metacubex/gvisor/pkg/tcpip/stack"
+	"golang.org/x/sys/unix"
 )
 
 // linkDispatcher reads packets from the link FD and dispatches them to the
@@ -366,34 +366,20 @@ func New(opts *Options) (stack.LinkEndpoint, error) {
 }
 
 func createInboundDispatcher(e *endpoint, fd int, isSocket bool, opts *Options) (linkDispatcher, error) {
-	// By default use the readv() dispatcher as it works with all kinds of
-	// FDs (tap/tun/unix domain sockets and af_packet).
-	inboundDispatcher, err := newReadVDispatcher(fd, e, opts)
-	if err != nil {
-		return nil, fmt.Errorf("newReadVDispatcher(%d, %+v) = %v", fd, e, err)
-	}
-
+	// Select before allocating: constructing a fallback readv dispatcher and then
+	// replacing it leaked its eventfd, buffers and processor goroutines.
 	if isSocket {
 		switch e.packetDispatchMode {
 		case PacketMMap:
-			inboundDispatcher, err = newPacketMMapDispatcher(fd, e, opts)
-			if err != nil {
-				return nil, fmt.Errorf("newPacketMMapDispatcher(%d, %+v) = %v", fd, e, err)
-			}
+			return newPacketMMapDispatcher(fd, e, opts)
 		case RecvMMsg:
-			// If the provided FD is a socket then we optimize
-			// packet reads by using recvmmsg() instead of read() to
-			// read packets in a batch.
-			inboundDispatcher, err = newRecvMMsgDispatcher(fd, e, opts)
-			if err != nil {
-				return nil, fmt.Errorf("newRecvMMsgDispatcher(%d, %+v) = %v", fd, e, err)
-			}
+			return newRecvMMsgDispatcher(fd, e, opts)
 		case Readv:
 		default:
 			return nil, fmt.Errorf("unknown dispatch mode %d", e.packetDispatchMode)
 		}
 	}
-	return inboundDispatcher, nil
+	return newReadVDispatcher(fd, e, opts)
 }
 
 // IsPacketSocket checks if the FD is an AF_PACKET socket.

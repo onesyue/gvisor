@@ -20,6 +20,7 @@ package stopfd
 
 import (
 	"fmt"
+	"sync"
 
 	"golang.org/x/sys/unix"
 )
@@ -28,7 +29,9 @@ import (
 //
 // +stateify savable
 type StopFD struct {
-	EFD int
+	EFD    int
+	mu     sync.Mutex `state:"nosave"`
+	closed bool
 }
 
 // New returns a new, initialized StopFD.
@@ -43,6 +46,11 @@ func New() (StopFD, error) {
 // Stop writes to the eventfd and notifies the dispatcher to stop. It does not
 // block.
 func (sf *StopFD) Stop() {
+	sf.mu.Lock()
+	defer sf.mu.Unlock()
+	if sf.closed {
+		return
+	}
 	increment := []byte{1, 0, 0, 0, 0, 0, 0, 0}
 	if n, err := unix.Write(sf.EFD, increment); n != len(increment) || err != nil {
 		// There are two possible errors documented in eventfd(2) for writing:
@@ -51,4 +59,16 @@ func (sf *StopFD) Stop() {
 		// thus no EAGAIN.
 		panic(fmt.Sprintf("write(EFD) = (%d, %s), want (%d, nil)", n, err, len(increment)))
 	}
+}
+
+// Close releases the wake descriptor after its dispatch loop has stopped. It
+// also serializes a later Stop, which must never write to a reused descriptor.
+func (sf *StopFD) Close() {
+	sf.mu.Lock()
+	defer sf.mu.Unlock()
+	if sf.closed {
+		return
+	}
+	sf.closed = true
+	_ = unix.Close(sf.EFD)
 }
