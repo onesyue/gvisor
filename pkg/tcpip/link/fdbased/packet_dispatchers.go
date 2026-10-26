@@ -18,13 +18,13 @@
 package fdbased
 
 import (
-	"golang.org/x/sys/unix"
 	"github.com/metacubex/gvisor/pkg/buffer"
 	"github.com/metacubex/gvisor/pkg/rawfile"
 	"github.com/metacubex/gvisor/pkg/tcpip"
 	"github.com/metacubex/gvisor/pkg/tcpip/link/stopfd"
 	"github.com/metacubex/gvisor/pkg/tcpip/stack"
 	"github.com/metacubex/gvisor/pkg/tcpip/stack/gro"
+	"golang.org/x/sys/unix"
 )
 
 // BufConfig defines the shape of the buffer used to read packets from the NIC.
@@ -182,6 +182,7 @@ func newReadVDispatcher(fd int, e *endpoint, opts *Options) (linkDispatcher, err
 }
 
 func (d *readVDispatcher) release() {
+	d.StopFD.Close()
 	d.buf.release()
 	d.mgr.close()
 }
@@ -270,6 +271,7 @@ func newRecvMMsgDispatcher(fd int, e *endpoint, opts *Options) (linkDispatcher, 
 }
 
 func (d *recvMMsgDispatcher) release() {
+	d.StopFD.Close()
 	for _, iov := range d.bufs {
 		iov.release()
 	}

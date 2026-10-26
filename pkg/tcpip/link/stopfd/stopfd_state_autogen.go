@@ -18,6 +18,7 @@ func (sf *StopFD) StateTypeName() string {
 func (sf *StopFD) StateFields() []string {
 	return []string{
 		"EFD",
+		"closed",
 	}
 }
 
@@ -27,6 +28,7 @@ func (sf *StopFD) beforeSave() {}
 func (sf *StopFD) StateSave(stateSinkObject state.Sink) {
 	sf.beforeSave()
 	stateSinkObject.Save(0, &sf.EFD)
+	stateSinkObject.Save(1, &sf.closed)
 }
 
 func (sf *StopFD) afterLoad(context.Context) {}
@@ -34,6 +36,7 @@ func (sf *StopFD) afterLoad(context.Context) {}
 // +checklocksignore
 func (sf *StopFD) StateLoad(ctx context.Context, stateSourceObject state.Source) {
 	stateSourceObject.Load(0, &sf.EFD)
+	stateSourceObject.Load(1, &sf.closed)
 }
 
 func init() {

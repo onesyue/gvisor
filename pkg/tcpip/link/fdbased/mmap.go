@@ -20,12 +20,12 @@ package fdbased
 import (
 	"encoding/binary"
 
-	"golang.org/x/sys/unix"
 	"github.com/metacubex/gvisor/pkg/buffer"
 	"github.com/metacubex/gvisor/pkg/rawfile"
 	"github.com/metacubex/gvisor/pkg/tcpip"
 	"github.com/metacubex/gvisor/pkg/tcpip/link/stopfd"
 	"github.com/metacubex/gvisor/pkg/tcpip/stack"
+	"golang.org/x/sys/unix"
 )
 
 const (
@@ -136,6 +136,7 @@ type packetMMapDispatcher struct {
 }
 
 func (d *packetMMapDispatcher) release() {
+	d.StopFD.Close()
 	d.mgr.close()
 }
 
